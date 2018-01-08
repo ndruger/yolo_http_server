@@ -1,0 +1,182 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>YOLO v2</title>
+    <style>
+    .dummy-image{
+      position: absolute;
+      width: 640px;
+      height: 480px;
+    }
+    .main-img-list {
+      display: flex;
+    }
+    .main-img-container {
+      margin: 10px;
+    }
+
+    canvas {
+      position: relative;
+    }
+    </style>
+  </head>
+  <body>
+    <div>
+      This page
+      <ul>
+        <li>Sends snap the camera image to YOLO http server per 10 seconds.</li>
+        <li>Receives the responses and show detected boxes.</li>
+      </ul>
+    </div>
+    <div class="main-img-list">
+      <div class="main-img-container">
+        <h3>Camera</h3>
+        <video id="video" width="640" height="480" autoplay></video>
+      </div>
+      <div class="main-img-container">
+        <h3>Sent image and detected boxes<h3>
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.js"></script>
+    <script>
+      const YOLO_SERVER = 'http://127.0.0.1:8000/';
+      const imgHeight = 480;
+      const imgWidth = 640;
+      const detectionImgSize = 608; // based on server.py
+      const video = document.getElementById('video');
+
+      function base64_to_bin(base64) {
+        const charas = atob(base64)
+        const bin = new Uint8Array(charas.length)
+        _.each(charas, (c, i) => {
+          bin[i] = charas.charCodeAt(i);
+        })
+        return bin
+      }
+
+      function bin_to_base64(bin) {
+        const charas = _.map(bin, (b, i) => {
+          return String.fromCharCode(bin[i])
+        }).join('');
+        return btoa(charas)
+      }
+
+      function toBinDataUrlWithCrop(canvas, x, y, w, h) {
+        // temporary canvas for crop
+        const tmp_canvas = document.createElement('canvas');
+        const ctx = tmp_canvas.getContext('2d');
+        tmp_canvas.width = w;
+        tmp_canvas.height = h;
+        ctx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+        const base64 = tmp_canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '')
+        return base64_to_bin(base64);
+      }
+
+      function base64_to_bin(base64) {
+        const charas = atob(base64)
+        const bin = new Uint8Array(charas.length)
+        _.each(charas, (c, i) => {
+          bin[i] = charas.charCodeAt(i);
+        })
+        return bin
+      }
+
+      function bin_to_base64(bin) {
+        const charas = _.map(bin, (b, i) => {
+          return String.fromCharCode(bin[i])
+        }).join('');
+        return btoa(charas)
+      }
+
+      function toBinDataUrlWithCrop(canvas, x, y, w, h) {
+        // temporary canvas for crop
+        const tmp_canvas = document.createElement('canvas');
+        const ctx = tmp_canvas.getContext('2d');
+        tmp_canvas.width = w;
+        tmp_canvas.height = h;
+        ctx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+        const base64 = tmp_canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '')
+        return base64_to_bin(base64);
+      }
+
+      if (window.location.search.includes('dummy_movie')) {
+        video.src = 'dummy.mp4';
+        video.play();
+      } else {
+        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                video.src = window.URL.createObjectURL(stream);
+                video.play();
+            });
+        }
+      }
+
+      const canvas = document.getElementById('canvas');
+      const context = canvas.getContext('2d');
+
+      function drawBoxes(detectedItems) {
+        const lineWidth = 2;
+        context.lineWidth = lineWidth;
+        const hScale = 1;
+        const vScale = 1;
+        const bgColor = 'red';
+        _.each(detectedItems, (item) => {
+          const [top, left, bottom, right] = item.box;
+          context.strokeStyle = bgColor;
+          context.strokeRect(
+            Math.floor(left * hScale),
+            Math.floor(top * vScale),
+            Math.floor((right - left) * hScale), 
+            Math.floor((bottom - top) * vScale)
+          );
+          context.fillStyle = bgColor;
+          const h = 14;
+          const w = 100;
+          context.fillRect(
+            Math.floor(left * hScale - lineWidth / 2),
+            Math.floor(top * vScale - h),
+            Math.floor(w), 
+            Math.floor(h)
+          );
+          const pad = 2;
+          context.fillStyle = 'white';
+          context.font = '10px';
+          context.fillText(`${item.class} ${item.score.toFixed(4)}`, left * hScale - lineWidth / 2 + pad, top * vScale - h / 2 + pad);
+        });
+      }
+
+
+      function detect() {
+        context.drawImage(video, 0, 0, imgWidth, imgHeight);
+        const canvasData = toBinDataUrlWithCrop(canvas, 0, 0, imgWidth, imgHeight);
+        const xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+              const detectedItems = JSON.parse(xhr.response);
+              console.log('detectedItems', detectedItems);
+              // ex. detectedItems == [
+              //   {
+              //     "class": "bottle", "box": [362.3731689453125, 580.5281982421875, 410.8177795410156, 610.7447509765625], "score": 0.44796618819236755
+              //   },
+              // ];
+              drawBoxes(detectedItems);
+            }
+          }
+        }
+        xhr.open('post', YOLO_SERVER, true);
+        xhr.setRequestHeader('Content-type','application/x-www-form-urlencoded');
+        xhr.send(canvasData);
+      }
+
+      setTimeout(() => {
+        detect();
+        setInterval(() => {
+          detect();
+        }, 10 * 1000);
+      }, 1000);
+ 
+    </script>
+  </body>
+</html>
