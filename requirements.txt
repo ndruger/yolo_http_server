@@ -7,7 +7,7 @@ flake8==3.5.0
 flake8-polyfill==1.0.2
 h5py==2.7.0
 html5lib==0.9999999
-idna==2.6
+idna==2.8
 Keras==2.0.6
 Markdown==2.6.11
 mccabe==0.6.1
