@@ -6,7 +6,7 @@ enum34==1.1.6
 flake8==3.5.0
 flake8-polyfill==1.0.2
 h5py==2.7.0
-html5lib==0.9999999
+html5lib==1.0.1
 idna==2.6
 Keras==2.0.6
 Markdown==2.6.11
